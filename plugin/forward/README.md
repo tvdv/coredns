@@ -19,7 +19,7 @@ is taken as a healthy upstream. The health check uses the same protocol as speci
 When *all* upstreams are down it assumes health checking as a mechanism has failed and will try to
 connect to a random upstream (which may or may not work).
 
-This plugin can only be used once per Server Block.
+This plugin can be multiple times per Server Block.
 
 ## Syntax
 
@@ -52,6 +52,8 @@ forward FROM TO... {
     policy random|round_robin|sequential
     health_check DURATION [no_rec]
     max_concurrent MAX
+    source_ips CIDR LIST
+    name NAME
 }
 ~~~
 
@@ -93,6 +95,10 @@ forward FROM TO... {
   response does not count as a health failure. When choosing a value for **MAX**, pick a number
   at least greater than the expected *upstream query rate* * *latency* of the upstream servers.
   As an upper bound for **MAX**, consider that each concurrent query will use about 2kb of memory.
+
+* `source_ips` a list of CIDR notation. If the source of the DNS request does not match this list, then the request goes to the next plugin. Note that by omitting this, all source IPs are accepted.
+
+* `name` the name of the plugin - useful if more than 1 forward plugin, for debugging.
 
 Also note the TLS config is "global" for the whole forwarding proxy if you need a different
 `tls-name` for different upstreams you're out of luck.

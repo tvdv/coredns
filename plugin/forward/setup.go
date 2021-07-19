@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"strconv"
 	"time"
+	"net"
 
 	"github.com/coredns/caddy"
 	"github.com/coredns/coredns/core/dnsserver"
@@ -19,15 +20,21 @@ import (
 func init() { plugin.Register("forward", setup) }
 
 func setup(c *caddy.Controller) error {
-	f, err := parseForward(c)
+	_, err := parseAndRegisterForwards(c)
 	if err != nil {
 		return plugin.Error("forward", err)
 	}
+	
+	return nil
+}
+
+func register(f *Forward, c *caddy.Controller) error {
+	log.Infof("Registering %s", f.Name())
 	if f.Len() > max {
-		return plugin.Error("forward", fmt.Errorf("more than %d TOs configured: %d", max, f.Len()))
+		return plugin.Error(f.Name(), fmt.Errorf("more than %d TOs configured: %d", max, f.Len()))
 	}
 
-	dnsserver.GetConfig(c).AddPlugin(func(next plugin.Handler) plugin.Handler {
+	dnsserver.GetConfig(c).AddPlugin(func(next plugin.Handler) plugin.Handler {			
 		f.Next = next
 		return f
 	})
@@ -67,23 +74,27 @@ func (f *Forward) OnShutdown() error {
 	return nil
 }
 
-func parseForward(c *caddy.Controller) (*Forward, error) {
+func parseAndRegisterForwards(c *caddy.Controller) ([]*Forward, error) {
 	var (
-		f   *Forward
+		f *Forward
+		fwdList []*Forward
 		err error
 		i   int
 	)
+
 	for c.Next() {
-		if i > 0 {
-			return nil, plugin.ErrOnce
-		}
 		i++
 		f, err = parseStanza(c)
 		if err != nil {
 			return nil, err
 		}
+		fwdList = append(fwdList, f)
+		err = register(f, c)
+		if err != nil {
+			return nil, err
+		}
 	}
-	return f, nil
+	return fwdList, nil
 }
 
 func parseStanza(c *caddy.Controller) (*Forward, error) {
@@ -257,7 +268,23 @@ func parseBlock(c *caddy.Controller, f *Forward) error {
 		}
 		f.ErrLimitExceeded = errors.New("concurrent queries exceeded maximum " + c.Val())
 		f.maxConcurrent = int64(n)
-
+	case "source_ips":
+		args := c.RemainingArgs()
+		if len(args) == 0 {
+			return c.ArgErr()
+		}
+		for _, str := range args {
+			var _, cidr, err = net.ParseCIDR(str)
+			if err != nil {
+				return c.ArgErr();
+			}
+			f.sourceIPs = append(f.sourceIPs, cidr)	
+		}
+	case "name":
+		if !c.NextArg() {
+			return c.ArgErr()
+		}
+		f.name = c.Val()
 	default:
 		return c.Errf("unknown property '%s'", c.Val())
 	}

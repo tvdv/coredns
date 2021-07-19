@@ -10,6 +10,7 @@ import (
 	"errors"
 	"sync/atomic"
 	"time"
+	"net"
 
 	"github.com/coredns/coredns/plugin"
 	"github.com/coredns/coredns/plugin/debug"
@@ -33,6 +34,10 @@ type Forward struct {
 	p          Policy
 	hcInterval time.Duration
 
+	sourceIPs []*net.IPNet // A CIDR spec list for allowed source IPs, to use this forward, otherwise req goes to next plugin
+
+	name 	string // name of the plugin
+
 	from    string
 	ignored []string
 
@@ -55,7 +60,7 @@ type Forward struct {
 
 // New returns a new Forward.
 func New() *Forward {
-	f := &Forward{maxfails: 2, tlsConfig: new(tls.Config), expire: defaultExpire, p: new(random), from: ".", hcInterval: hcInterval, opts: options{forceTCP: false, preferUDP: false, hcRecursionDesired: true}}
+	f := &Forward{name: "forward", maxfails: 2, tlsConfig: new(tls.Config), expire: defaultExpire, p: new(random), from: ".", hcInterval: hcInterval, opts: options{forceTCP: false, preferUDP: false, hcRecursionDesired: true}}
 	return f
 }
 
@@ -65,11 +70,21 @@ func (f *Forward) SetProxy(p *Proxy) {
 	p.start(f.hcInterval)
 }
 
+// Convert a net.Addr struct to a net.IP struct
+// Returns nil, if it fails
+func AddrToIp(addr net.Addr) net.IP {
+	actualSrcIpStr, _, err := net.SplitHostPort(addr.String())
+	if err != nil {
+		return nil
+	}
+	return net.ParseIP(actualSrcIpStr)
+}
+
 // Len returns the number of configured proxies.
 func (f *Forward) Len() int { return len(f.proxies) }
 
 // Name implements plugin.Handler.
-func (f *Forward) Name() string { return "forward" }
+func (f *Forward) Name() string { return f.name }
 
 // ServeDNS implements plugin.Handler.
 func (f *Forward) ServeDNS(ctx context.Context, w dns.ResponseWriter, r *dns.Msg) (int, error) {
@@ -77,6 +92,33 @@ func (f *Forward) ServeDNS(ctx context.Context, w dns.ResponseWriter, r *dns.Msg
 	state := request.Request{W: w, Req: r}
 	if !f.match(state) {
 		return plugin.NextOrFailure(f.Name(), f.Next, ctx, w, r)
+	}
+
+	// if enabled, check if the source IP is allowed to use this forwarder
+	if len(f.sourceIPs) > 0 {
+		valid := false
+		actualSrcIp := AddrToIp(w.RemoteAddr())
+		if actualSrcIp == nil {
+			clog.Errorf("%s: Could not parser source IP (%s)", f.Name(), w.RemoteAddr().String())
+			return dns.RcodeServerFailure, plugin.Error(f.Name(), errors.New("Could not parse source IP"))
+		}
+
+		// compare source IP against allowed Net list
+		for _, srcCIDR := range f.sourceIPs {
+			if srcCIDR.Contains(actualSrcIp) {
+				// source IP appears in allowed list
+				valid = true
+				break
+			}
+		}
+
+		if !valid {
+			// source IP did not appear in the allowed list, pass to next plugin
+			clog.Debugf("%s. Request from %s ignored. Passed to next plugin.", f.Name(), actualSrcIp)
+			return plugin.NextOrFailure(f.Name(), f.Next, ctx, w, r)
+		} else {
+			clog.Debugf("%s: Request from %s allowed.", f.Name(), actualSrcIp)
+		}
 	}
 
 	if f.maxConcurrent > 0 {
