@@ -4,6 +4,7 @@ import (
 	"crypto/tls"
 	"sort"
 	"time"
+	"net"
 
 	"github.com/miekg/dns"
 )
@@ -21,6 +22,7 @@ type Transport struct {
 	expire      time.Duration                  // After this duration a connection is expired.
 	addr        string
 	tlsConfig   *tls.Config
+	localAddr	net.Addr
 
 	dial  chan string
 	yield chan *persistConn
@@ -148,6 +150,8 @@ func (t *Transport) SetExpire(expire time.Duration) { t.expire = expire }
 // SetTLSConfig sets the TLS config in transport.
 func (t *Transport) SetTLSConfig(cfg *tls.Config) { t.tlsConfig = cfg }
 
+// SetLocalAddr specify the local address to use when connecting to the proxy
+func (t *Transport) SetLocalAddr(addr net.Addr) { t.localAddr = addr }
 const (
 	defaultExpire  = 10 * time.Second
 	minDialTimeout = 1 * time.Second

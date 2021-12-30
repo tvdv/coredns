@@ -10,7 +10,8 @@ import (
 	"strconv"
 	"sync/atomic"
 	"time"
-
+	"net"
+	"fmt"
 	"github.com/coredns/coredns/request"
 
 	"github.com/miekg/dns"
@@ -62,14 +63,24 @@ func (t *Transport) Dial(proto string) (*persistConn, bool, error) {
 	reqTime := time.Now()
 	timeout := t.dialTimeout()
 	if proto == "tcp-tls" {
-		conn, err := dns.DialTimeoutWithTLS("tcp", t.addr, t.tlsConfig, timeout)
+		//if t.localAddr != nil {
+		//}
+		//ipAddr := net.TCPAddr{IP: net.ParseIP("192.168.56.1"), Port: 0}
+		//net.Addr{network: "ip", string: "127.0.0.1"}
+
+		dialer := net.Dialer {Timeout: timeout, LocalAddr: t.localAddr}
+		fmt.Println("specified localaddr on dial")
+		conn, err := dns.DialCustom(proto, t.addr, t.tlsConfig, &dialer)
+		fmt.Println("err: ", err)
 		t.updateDialTimeout(time.Since(reqTime))
 		return &persistConn{c: conn}, false, err
 	}
-	conn, err := dns.DialTimeout(proto, t.addr, timeout)
+
+	conn, err := dns.DialCustom(proto, t.addr, nil, &net.Dialer{Timeout: timeout})
 	t.updateDialTimeout(time.Since(reqTime))
 	return &persistConn{c: conn}, false, err
 }
+
 
 // Connect selects an upstream, sends the request and waits for a response.
 func (p *Proxy) Connect(ctx context.Context, state request.Request, opts options) (*dns.Msg, error) {

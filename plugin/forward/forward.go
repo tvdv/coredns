@@ -10,6 +10,7 @@ import (
 	"errors"
 	"sync/atomic"
 	"time"
+	"net"
 
 	"github.com/coredns/coredns/plugin"
 	"github.com/coredns/coredns/plugin/debug"
@@ -37,6 +38,8 @@ type Forward struct {
 	from    string
 	ignored []string
 
+	outgoingLocalAddr net.Addr
+
 	tlsConfig     *tls.Config
 	tlsServerName string
 	maxfails      uint32
@@ -44,6 +47,7 @@ type Forward struct {
 	maxConcurrent int64
 
 	opts options // also here for testing
+
 
 	// ErrLimitExceeded indicates that a query was rejected because the number of concurrent queries has exceeded
 	// the maximum allowed (maxConcurrent)

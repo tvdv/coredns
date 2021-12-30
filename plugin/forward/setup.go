@@ -6,7 +6,7 @@ import (
 	"fmt"
 	"strconv"
 	"time"
-
+	"net"
 	"github.com/coredns/caddy"
 	"github.com/coredns/coredns/core/dnsserver"
 	"github.com/coredns/coredns/plugin"
@@ -142,6 +142,7 @@ func parseStanza(c *caddy.Controller) (*Forward, error) {
 		if transports[i] == transport.TLS {
 			f.proxies[i].SetTLSConfig(f.tlsConfig)
 		}
+		f.proxies[i].SetLocalAddr(f.outgoingLocalAddr)
 		f.proxies[i].SetExpire(f.expire)
 		f.proxies[i].health.SetRecursionDesired(f.opts.hcRecursionDesired)
 	}
@@ -258,7 +259,16 @@ func parseBlock(c *caddy.Controller, f *Forward) error {
 		}
 		f.ErrLimitExceeded = errors.New("concurrent queries exceeded maximum " + c.Val())
 		f.maxConcurrent = int64(n)
-
+	case "outgoing_local_addr":
+		if !c.NextArg() {
+			return c.ArgErr()
+		}
+		// TODO: Make generic for UDP and tcp
+		src, err := net.ResolveTCPAddr("tcp-tls", c.Val())
+		f.outgoingLocalAddr = src
+		if err != nil {
+			return err
+		}
 	default:
 		return c.Errf("unknown property '%s'", c.Val())
 	}
