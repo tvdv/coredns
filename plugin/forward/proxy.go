@@ -5,7 +5,7 @@ import (
 	"runtime"
 	"sync/atomic"
 	"time"
-
+	"net"
 	"github.com/coredns/coredns/plugin/pkg/up"
 )
 
@@ -42,6 +42,8 @@ func (p *Proxy) SetTLSConfig(cfg *tls.Config) {
 
 // SetExpire sets the expire duration in the lower p.transport.
 func (p *Proxy) SetExpire(expire time.Duration) { p.transport.SetExpire(expire) }
+
+func (p *Proxy) SetLocalAddr(addr net.Addr) { p.transport.SetLocalAddr(addr) }
 
 // Healthcheck kicks of a round of health checks for this proxy.
 func (p *Proxy) Healthcheck() {

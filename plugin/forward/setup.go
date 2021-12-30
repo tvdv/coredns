@@ -264,7 +264,7 @@ func parseBlock(c *caddy.Controller, f *Forward) error {
 			return c.ArgErr()
 		}
 		// TODO: Make generic for UDP and tcp
-		src, err := net.ResolveTCPAddr("tcp-tls", c.Val())
+		src, err := net.ResolveTCPAddr("tcp", c.Val())
 		f.outgoingLocalAddr = src
 		if err != nil {
 			return err

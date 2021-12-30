@@ -152,6 +152,7 @@ func (t *Transport) SetTLSConfig(cfg *tls.Config) { t.tlsConfig = cfg }
 
 // SetLocalAddr specify the local address to use when connecting to the proxy
 func (t *Transport) SetLocalAddr(addr net.Addr) { t.localAddr = addr }
+
 const (
 	defaultExpire  = 10 * time.Second
 	minDialTimeout = 1 * time.Second

@@ -69,9 +69,13 @@ func (t *Transport) Dial(proto string) (*persistConn, bool, error) {
 		//net.Addr{network: "ip", string: "127.0.0.1"}
 
 		dialer := net.Dialer {Timeout: timeout, LocalAddr: t.localAddr}
-		fmt.Println("specified localaddr on dial")
+		if t.localAddr != nil {
+			fmt.Println("specified localaddr on dial")
+		}
 		conn, err := dns.DialCustom(proto, t.addr, t.tlsConfig, &dialer)
-		fmt.Println("err: ", err)
+		if err != nil {
+			fmt.Println("err: ", err)
+		}
 		t.updateDialTimeout(time.Since(reqTime))
 		return &persistConn{c: conn}, false, err
 	}
