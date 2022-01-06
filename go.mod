@@ -40,3 +40,5 @@ require (
 	k8s.io/client-go v0.23.1
 	k8s.io/klog/v2 v2.40.1
 )
+
+replace github.com/miekg/dns v1.1.43 => github.com/tvdv/dns v1.1.44-0.20220106054825-5c2ad3b36b09
