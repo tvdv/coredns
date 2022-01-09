@@ -1,4 +1,4 @@
-module github.com/coredns/coredns
+module github.com/tvdv/coredns
 
 go 1.16
 
